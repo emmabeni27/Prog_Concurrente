@@ -32,12 +32,12 @@ fn handle_client(p0: TcpStream) {
     }
 
     //parseo la primera línea
-    let mut slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
+    let slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
     //acalro el tipo para que no sea unkown para el exterior. .collect() me permite acceder por índice
 
     //construyo la rta
     let route = &slices[1];
-    let mut slash: Vec<&str> = route.split("/").collect();
+    let slash: Vec<&str> = route.split("/").collect();
 
     let response;
     if slash[1] == "pi" {
@@ -86,3 +86,4 @@ fn liebniz(i: u64) -> f64{ //unsigned --> ntero y positivo
 }
 
 //liebniz es matemático, no teine sentido que pueda fallar
+//hay mensaaje de error pero no se muestran en un body
