@@ -1,6 +1,6 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime};
 
 fn main() -> std::io::Result<()>{
 
@@ -24,7 +24,7 @@ fn handle_client(p0: TcpStream) {
     lines.read_line(&mut first_line).unwrap(); // guardo el contenido
 
     //debo consumir el resto del contendio para que el stream no quede atascado y el cliente esperando
-    for line in lines.lines(){
+    for line in lines.by_ref().lines(){ //toma prestado el reader y luego lo devuelve
         let line = line.unwrap();
         if line.is_empty(){
             break; //paro de leer porque empiezan los headers
@@ -39,32 +39,37 @@ fn handle_client(p0: TcpStream) {
     let route = &slices[1];
     let mut slash: Vec<&str> = route.split("/").collect();
 
+    let response;
     if slash[1] == "pi" {
         match slash[2].parse::<u64>() {
             Ok(numero) => {
-                let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-                let resultado = liebniz(numero);
-                let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-                let time= end-start;
+                let start = SystemTime::now();
+                let result = liebniz(numero);
+                let time = start.elapsed().unwrap();
 
                 let body = format!(
                     "Valor de Pi para el termino {}: {} (Tiempo: {:?})",
                     slash[2],
-                    resultado,
+                    result,
                     time,
                 );
 
-                let response = format!(
+                response = format!(
                     "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
                     body.len(),
                     body
                 );
             },
             Err(_) => {
-                // construir respuesta 400 con mensaje de error
+                response = "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: 0\r\n\r\n".to_string();
             }
         }
+    } else{
+        response = "HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\n\r\n".to_string();
     }
+
+    //enviar rta
+    lines.get_mut().write_all(response.as_bytes()).unwrap();
 }
 
 //servidor de socket tcp escuchando conexiones
