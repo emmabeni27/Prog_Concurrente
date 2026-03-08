@@ -8,9 +8,13 @@ fn main() -> std::io::Result<()>{
     let listener = TcpListener::bind("127.0.0.1:3000")?;
 
     //aceptar conexiones continuas y procesarlas
-    for stream in listener.incoming(){
-        handle_client(stream?);
+    for stream in listener.incoming() {
+        let stream = stream?; //? cumple la función de unwrap()
+        std::thread::spawn(|| {
+            handle_client(stream);
+        });
     }
+
 
     Ok(())
 }
