@@ -61,11 +61,20 @@ fn handle_client(p0: TcpStream) {
                 );
             },
             Err(_) => {
-                response = "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: 0\r\n\r\n".to_string();
+                let body = "El argumento introducido deber ser un positivo entero. Ejemplo: /pi/100";
+
+                response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+                body.len(),
+                body); //content length = 0
             }
         }
     } else{
-        response = "HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\n\r\n".to_string();
+
+        let body = "La ruta es pi. Ejemplo: /pi/100";
+
+        response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+        body.len(),
+        body); //primer rn termina el último header, segundo rn línea vacía obligatoria
     }
 
     //enviar rta
@@ -80,7 +89,7 @@ fn liebniz(i: u64) -> f64{ //unsigned --> ntero y positivo
     let mut total :f64 = 0.0;
 
     for i in 0..=i{ //rango inclusivo
-        total += (-1.0f64).powi(i as i32) / (2.0*i as f64 + 1.0);
+        total += (if i%2 == 0 {1.0} else {-1.0}) / (2.0*i as f64 + 1.0); //ambas partes deben ser f64
     }
     4.0*total //no necesito el return
 }
