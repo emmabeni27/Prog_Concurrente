@@ -14,4 +14,4 @@ for i in {1..100}; do
 done
 
 wait
-echo "Listo: los 16 curls terminaron"
+
