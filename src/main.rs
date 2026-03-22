@@ -37,11 +37,25 @@ fn handle_client(mut p0: TcpStream) {
 
     //parseo la primera línea
     let slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
+    if slices.len() < 2 {
+    return;
+    }
     //acalro el tipo para que no sea unkown para el exterior. .collect() me permite acceder por índice
 
     //construyo la rta
     let route = &slices[1];
     let slash: Vec<&str> = route.split("/").collect();
+    
+    if slash.len() < 3 {
+    let body = "Formato inválido. Usar /pi/<numero>";
+    let response = format!(
+        "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    p0.write_all(response.as_bytes()).unwrap();
+    return;
+}
 
     let response;
     if slash[1] == "pi" {
