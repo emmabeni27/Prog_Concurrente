@@ -20,9 +20,9 @@ fn main() -> std::io::Result<()>{
 }
 
 //lee header del request http del tcpStream
-fn handle_client(p0: TcpStream) {
+fn handle_client(mut p0: TcpStream) {
 
-    let mut lines = BufReader::new(p0); //para poder leerlo línea a línea
+    let mut lines = BufReader::new(&mut p0); //para poder leerlo línea a línea
 
     let mut first_line = String::new(); //tomo la primera línea, me interesa pro el contenido
     lines.read_line(&mut first_line).unwrap(); // guardo el contenido
@@ -59,7 +59,7 @@ fn handle_client(p0: TcpStream) {
                 );
 
                 response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
                     body.len(),
                     body
                 );
@@ -67,7 +67,7 @@ fn handle_client(p0: TcpStream) {
             Err(_) => {
                 let body = "El argumento introducido deber ser un positivo entero. Ejemplo: /pi/100";
 
-                response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+                response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
                 body.len(),
                 body); //content length = 0
             }
@@ -76,13 +76,13 @@ fn handle_client(p0: TcpStream) {
 
         let body = "La ruta es pi. Ejemplo: /pi/100";
 
-        response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+        response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
         body.len(),
         body); //primer rn termina el último header, segundo rn línea vacía obligatoria
     }
 
     //enviar rta
-    lines.get_mut().write_all(response.as_bytes()).unwrap();
+    p0.write_all(response.as_bytes()).unwrap();
 }
 
 //servidor de socket tcp escuchando conexiones
