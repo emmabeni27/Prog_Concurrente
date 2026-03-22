@@ -1,6 +1,7 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::{SystemTime};
+use std::thread;
 
 fn main() -> std::io::Result<()>{
 
@@ -102,14 +103,45 @@ fn handle_client(mut p0: TcpStream) {
 //servidor de socket tcp escuchando conexiones
 // & referencia sin tomar ownership
 
-fn liebniz(i: u64) -> f64{ //unsigned --> ntero y positivo
+fn liebniz(n: u64) -> f64 {
+    let num_threads = 8; // podés ajustar (ideal: 4 u 8 en tu CPU)
+    let chunk_size = n / num_threads;
 
-    let mut total :f64 = 0.0;
+    let mut handles = Vec::new();
 
-    for i in 0..=i{ //rango inclusivo
-        total += (if i%2 == 0 {1.0} else {-1.0}) / (2.0*i as f64 + 1.0); //ambas partes deben ser f64
+    for t in 0..num_threads {
+        let start = t * chunk_size;
+        let end = if t == num_threads - 1 {
+            n
+        } else {
+            (t + 1) * chunk_size - 1
+        };
+
+        let handle = thread::spawn(move || {
+            parcial(start, end)
+        });
+
+        handles.push(handle);
     }
-    4.0*total //no necesito el return
+
+    let mut total:f64 = 0.0;
+
+    for h in handles {
+        total += h.join().unwrap();
+    }
+
+    4.0 * total
+}
+
+fn parcial(start: u64, end: u64) -> f64 {
+    let mut sum = 0.0;
+
+    for i in start..=end {
+        sum += (if i % 2 == 0 { 1.0 } else { -1.0 })
+            / (2.0 * i as f64 + 1.0);
+    }
+
+    sum
 }
 
 //liebniz es matemático, no teine sentido que pueda fallar
