@@ -6,11 +6,13 @@ fn main() -> std::io::Result<()>{
 
     //creo un TcpListener escuchando en el puerto 3000
     let listener = TcpListener::bind("127.0.0.1:3000")?;
+    //let n = 6;
 
     //aceptar conexiones continuas y procesarlas
     for stream in listener.incoming() {
         let stream = stream?; //? cumple la función de unwrap()
-        std::thread::spawn(|| {
+        std::thread::spawn(|| { //closure ~ lambda
+            //let m= n+1;
             handle_client(stream);
         });
     }
