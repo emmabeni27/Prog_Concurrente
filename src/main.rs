@@ -1,6 +1,7 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::{SystemTime};
+use std::thread;
 
 fn main() -> std::io::Result<()>{
 
@@ -22,9 +23,9 @@ fn main() -> std::io::Result<()>{
 }
 
 //lee header del request http del tcpStream
-fn handle_client(p0: TcpStream) {
+fn handle_client(mut p0: TcpStream) {
 
-    let mut lines = BufReader::new(p0); //para poder leerlo línea a línea
+    let mut lines = BufReader::new(&mut p0); //para poder leerlo línea a línea
 
     let mut first_line = String::new(); //tomo la primera línea, me interesa pro el contenido
     lines.read_line(&mut first_line).unwrap(); // guardo el contenido
@@ -39,11 +40,25 @@ fn handle_client(p0: TcpStream) {
 
     //parseo la primera línea
     let slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
+    if slices.len() < 2 {
+    return;
+    }
     //acalro el tipo para que no sea unkown para el exterior. .collect() me permite acceder por índice
 
     //construyo la rta
     let route = &slices[1];
     let slash: Vec<&str> = route.split("/").collect();
+    
+    if slash.len() < 3 {
+    let body = "Formato inválido. Usar /pi/<numero>";
+    let response = format!(
+        "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    p0.write_all(response.as_bytes()).unwrap();
+    return;
+}
 
     let response;
     if slash[1] == "pi" {
@@ -61,7 +76,7 @@ fn handle_client(p0: TcpStream) {
                 );
 
                 response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
                     body.len(),
                     body
                 );
@@ -69,7 +84,7 @@ fn handle_client(p0: TcpStream) {
             Err(_) => {
                 let body = "El argumento introducido deber ser un positivo entero. Ejemplo: /pi/100";
 
-                response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+                response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
                 body.len(),
                 body); //content length = 0
             }
@@ -78,26 +93,57 @@ fn handle_client(p0: TcpStream) {
 
         let body = "La ruta es pi. Ejemplo: /pi/100";
 
-        response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+        response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
         body.len(),
         body); //primer rn termina el último header, segundo rn línea vacía obligatoria
     }
 
     //enviar rta
-    lines.get_mut().write_all(response.as_bytes()).unwrap();
+    p0.write_all(response.as_bytes()).unwrap();
 }
 
 //servidor de socket tcp escuchando conexiones
 // & referencia sin tomar ownership
 
-fn liebniz(i: u64) -> f64{ //unsigned --> ntero y positivo
+fn liebniz(n: u64) -> f64 {
+    let num_threads = 8; // podés ajustar (ideal: 4 u 8 en tu CPU)
+    let chunk_size = n / num_threads;
 
-    let mut total :f64 = 0.0;
+    let mut handles = Vec::new();
 
-    for i in 0..=i{ //rango inclusivo
-        total += (if i%2 == 0 {1.0} else {-1.0}) / (2.0*i as f64 + 1.0); //ambas partes deben ser f64
+    for t in 0..num_threads {
+        let start = t * chunk_size;
+        let end = if t == num_threads - 1 {
+            n
+        } else {
+            (t + 1) * chunk_size - 1
+        };
+
+        let handle = thread::spawn(move || {
+            parcial(start, end)
+        });
+
+        handles.push(handle);
     }
-    4.0*total //no necesito el return
+
+    let mut total:f64 = 0.0;
+
+    for h in handles {
+        total += h.join().unwrap();
+    }
+
+    4.0 * total
+}
+
+fn parcial(start: u64, end: u64) -> f64 {
+    let mut sum = 0.0;
+
+    for i in start..=end {
+        sum += (if i % 2 == 0 { 1.0 } else { -1.0 })
+            / (2.0 * i as f64 + 1.0);
+    }
+
+    sum
 }
 
 //liebniz es matemático, no teine sentido que pueda fallar
