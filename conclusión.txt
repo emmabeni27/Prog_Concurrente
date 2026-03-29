@@ -1,4 +1,4 @@
-Límite de eficiencia alrededor de 120 segundos
+Límite de eficiencia alrededor de 120 requests/segundos
 
 Se implementó un servidor HTTP simple en Rust utilizando un modelo de un hilo por conexión y se lo sometió a pruebas de carga con ApacheBench variando la concurrencia. Inicialmente aparecieron errores, que no se debían a la concurrencia ni al hardware sino a problemas en la implementación: uso incorrecto de BufReader junto con escritura directa sobre el stream y diferencias en el tamaño de las respuestas, lo que hacía que la herramienta marcara fallos de longitud. Esos problemas se corrigieron separando correctamente lectura y escritura, usando write_all y agregando Connection: close, y se entendió que el flag -l solo evita que ApacheBench valide tamaños iguales cuando las respuestas son dinámicas. Una vez resuelto esto, el servidor dejó de fallar incluso con alta concurrencia, y el foco pasó a analizar rendimiento: al aumentar el nivel de concurrencia, el throughput crece hasta un punto y luego se estabiliza, mostrando que el límite real no es de correctitud sino de eficiencia, determinado por la CPU y el overhead de manejar muchos hilos.
 
