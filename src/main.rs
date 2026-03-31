@@ -106,7 +106,7 @@ fn handle_client(mut p0: TcpStream) {
 // & referencia sin tomar ownership
 
 fn liebniz(n: u64) -> f64 {
-    let num_threads = 8; // podés ajustar (ideal: 4 u 8 en tu CPU)
+    let num_threads = 8; // ajustable (ideal: 4 u 8 en mi CPU)
     let chunk_size = n / num_threads;
 
     let mut handles = Vec::new();
