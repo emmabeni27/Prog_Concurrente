@@ -4,3 +4,5 @@
 192.13 300
 182.01 600
 164.95 900
+
+Corre mucho más rápido cuando recién prendí la compu
