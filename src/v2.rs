@@ -1,5 +1,3 @@
-mod v2;
-
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::{SystemTime};
@@ -43,24 +41,24 @@ fn handle_client(mut p0: TcpStream) {
     //parseo la primera línea
     let slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
     if slices.len() < 2 {
-    return;
+        return;
     }
     //acalro el tipo para que no sea unkown para el exterior. .collect() me permite acceder por índice
 
     //construyo la rta
     let route = &slices[1];
     let slash: Vec<&str> = route.split("/").collect();
-    
+
     if slash.len() < 3 {
-    let body = "Formato inválido. Usar /pi/<numero>";
-    let response = format!(
-        "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body
-    );
-    p0.write_all(response.as_bytes()).unwrap();
-    return;
-}
+        let body = "Formato inválido. Usar /pi/<numero>";
+        let response = format!(
+            "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        p0.write_all(response.as_bytes()).unwrap();
+        return;
+    }
 
     let response;
     if slash[1] == "pi" {
@@ -87,8 +85,8 @@ fn handle_client(mut p0: TcpStream) {
                 let body = "El argumento introducido deber ser un positivo entero. Ejemplo: /pi/100";
 
                 response = format!("HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body); //content length = 0
+                                   body.len(),
+                                   body); //content length = 0
             }
         }
     } else{
@@ -96,8 +94,8 @@ fn handle_client(mut p0: TcpStream) {
         let body = "La ruta es pi. Ejemplo: /pi/100";
 
         response = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body); //primer rn termina el último header, segundo rn línea vacía obligatoria
+                           body.len(),
+                           body); //primer rn termina el último header, segundo rn línea vacía obligatoria
     }
 
     //enviar rta
