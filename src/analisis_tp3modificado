@@ -1,0 +1,276 @@
+larisabeni@larisabeni-HP-Elite-Dragonfly:~/Descargas/Prog_Concurrente/src$ ab -n 1000 -c 1  http://localhost:3000/pi/1000000B
+This is ApacheBench, Version 2.3 <$Revision: 1903618 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking localhost (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        
+Server Hostname:        localhost
+Server Port:            3000
+
+Document Path:          /pi/1000000B
+Document Length:        71 bytes
+
+Concurrency Level:      1
+Time taken for tests:   0.362 seconds
+Complete requests:      1000
+Failed requests:        0
+Non-2xx responses:      1000
+Total transferred:      164000 bytes
+HTML transferred:       71000 bytes
+Requests per second:    2761.90 [#/sec] (mean)
+Time per request:       0.362 [ms] (mean)
+Time per request:       0.362 [ms] (mean, across all concurrent requests)
+Transfer rate:          442.34 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.0      0       0
+Processing:     0    0   0.1      0       1
+Waiting:        0    0   0.1      0       1
+Total:          0    0   0.1      0       1
+
+Percentage of the requests served within a certain time (ms)
+  50%      0
+  66%      0
+  75%      0
+  80%      0
+  90%      0
+  95%      0
+  98%      0
+  99%      0
+ 100%      1 (longest request)
+larisabeni@larisabeni-HP-Elite-Dragonfly:~/Descargas/Prog_Concurrente/src$ ab -n 1000 -c 100  http://localhost:3000/pi/1000000B
+This is ApacheBench, Version 2.3 <$Revision: 1903618 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking localhost (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        
+Server Hostname:        localhost
+Server Port:            3000
+
+Document Path:          /pi/1000000B
+Document Length:        71 bytes
+
+Concurrency Level:      100
+Time taken for tests:   0.170 seconds
+Complete requests:      1000
+Failed requests:        0
+Non-2xx responses:      1000
+Total transferred:      164000 bytes
+HTML transferred:       71000 bytes
+Requests per second:    5880.35 [#/sec] (mean)
+Time per request:       17.006 [ms] (mean)
+Time per request:       0.170 [ms] (mean, across all concurrent requests)
+Transfer rate:          941.77 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    6   1.3      7      10
+Processing:     3   10   2.0     10      16
+Waiting:        0    7   2.0      8      14
+Total:         10   16   1.3     16      18
+
+Percentage of the requests served within a certain time (ms)
+  50%     16
+  66%     17
+  75%     17
+  80%     17
+  90%     17
+  95%     17
+  98%     18
+  99%     18
+ 100%     18 (longest request)
+larisabeni@larisabeni-HP-Elite-Dragonfly:~/Descargas/Prog_Concurrente/src$ ab -n 1000 -c 300  http://localhost:3000/pi/1000000B
+This is ApacheBench, Version 2.3 <$Revision: 1903618 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking localhost (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        
+Server Hostname:        localhost
+Server Port:            3000
+
+Document Path:          /pi/1000000B
+Document Length:        71 bytes
+
+Concurrency Level:      300
+Time taken for tests:   0.184 seconds
+Complete requests:      1000
+Failed requests:        0
+Non-2xx responses:      1000
+Total transferred:      164000 bytes
+HTML transferred:       71000 bytes
+Requests per second:    5443.04 [#/sec] (mean)
+Time per request:       55.116 [ms] (mean)
+Time per request:       0.184 [ms] (mean, across all concurrent requests)
+Transfer rate:          871.74 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   21   6.5     22      35
+Processing:     9   27  10.0     27      48
+Waiting:        0   19   7.5     20      36
+Total:         25   48   8.6     51      62
+
+Percentage of the requests served within a certain time (ms)
+  50%     51
+  66%     53
+  75%     53
+  80%     54
+  90%     58
+  95%     60
+  98%     62
+  99%     62
+ 100%     62 (longest request)
+larisabeni@larisabeni-HP-Elite-Dragonfly:~/Descargas/Prog_Concurrente/src$ ab -n 1000 -c 600  http://localhost:3000/pi/1000000B
+This is ApacheBench, Version 2.3 <$Revision: 1903618 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking localhost (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        
+Server Hostname:        localhost
+Server Port:            3000
+
+Document Path:          /pi/1000000B
+Document Length:        71 bytes
+
+Concurrency Level:      600
+Time taken for tests:   0.210 seconds
+Complete requests:      1000
+Failed requests:        0
+Non-2xx responses:      1000
+Total transferred:      164000 bytes
+HTML transferred:       71000 bytes
+Requests per second:    4752.02 [#/sec] (mean)
+Time per request:       126.262 [ms] (mean)
+Time per request:       0.210 [ms] (mean, across all concurrent requests)
+Transfer rate:          761.07 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   36  16.1     32      72
+Processing:    16   56  27.5     65     101
+Waiting:        0   38  20.8     48      75
+Total:         51   92  14.2     97     116
+
+Percentage of the requests served within a certain time (ms)
+  50%     97
+  66%    102
+  75%    102
+  80%    104
+  90%    109
+  95%    111
+  98%    114
+  99%    115
+ 100%    116 (longest request)
+larisabeni@larisabeni-HP-Elite-Dragonfly:~/Descargas/Prog_Concurrente/src$ ab -n 1000 -c 900  http://localhost:3000/pi/1000000B
+This is ApacheBench, Version 2.3 <$Revision: 1903618 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking localhost (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        
+Server Hostname:        localhost
+Server Port:            3000
+
+Document Path:          /pi/1000000B
+Document Length:        71 bytes
+
+Concurrency Level:      900
+Time taken for tests:   0.192 seconds
+Complete requests:      1000
+Failed requests:        0
+Non-2xx responses:      1000
+Total transferred:      164000 bytes
+HTML transferred:       71000 bytes
+Requests per second:    5206.76 [#/sec] (mean)
+Time per request:       172.852 [ms] (mean)
+Time per request:       0.192 [ms] (mean, across all concurrent requests)
+Transfer rate:          833.90 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   48  15.3     50      76
+Processing:    24   63  23.6     68      90
+Waiting:        0   46  25.1     63      72
+Total:         77  111  12.2    113     130
+
+Percentage of the requests served within a certain time (ms)
+  50%    113
+  66%    117
+  75%    119
+  80%    121
+  90%    126
+  95%    128
+  98%    130
+  99%    130
+ 100%    130 (longest request)
+

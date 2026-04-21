@@ -76,11 +76,11 @@ fn main() -> std::io::Result<()> {
     //creo un TcpListener escuchando en el puerto 3000
     let listener = TcpListener::bind("127.0.0.1:3000")?;
     //let n = 6;
-
+    let pool = ThreadPool::new(8);
     //aceptar conexiones continuas y procesarlas
     for stream in listener.incoming() {
         let stream = stream?; //? cumple la función de unwrap()
-        std::thread::spawn(|| {
+        pool.execute(move|| { //move es necesario, poruqe el closure tiene que tomar ownership de stream, si no, no compila
             //closure ~ lambda
             //let m= n+1;
             handle_client(stream);
@@ -177,44 +177,16 @@ fn handle_client(mut p0: TcpStream) {
 //servidor de socket tcp escuchando conexiones
 // & referencia sin tomar ownership
 
-//LIEBNIZ
+//LIEBNIZ - ahora sin paralelismo para optimizar el aporvechamiento del thread pool (si no, tengo x hilos trabajando dentro de cada hilo del thread pool)
 
 fn liebniz(n: u64) -> f64 {
-    let num_threads = 8; // ajustable (ideal: 4 u 8 en mi CPU)
-    let chunk_size = n / num_threads;
-
-    let mut handles = Vec::new();
-
-    for t in 0..num_threads {
-        let start = t * chunk_size;
-        let end = if t == num_threads - 1 {
-            n
-        } else {
-            (t + 1) * chunk_size - 1
-        };
-
-        let handle = thread::spawn(move || parcial(start, end));
-
-        handles.push(handle);
-    }
-
-    let mut total: f64 = 0.0;
-
-    for h in handles {
-        total += h.join().unwrap();
-    }
-
-    4.0 * total
-}
-
-fn parcial(start: u64, end: u64) -> f64 {
     let mut sum = 0.0;
 
-    for i in start..=end {
+    for i in 0..n {
         sum += (if i % 2 == 0 { 1.0 } else { -1.0 }) / (2.0 * i as f64 + 1.0);
     }
 
-    sum
+    4.0 * sum
 }
 
 //liebniz es matemático, no teine sentido que pueda fallar
