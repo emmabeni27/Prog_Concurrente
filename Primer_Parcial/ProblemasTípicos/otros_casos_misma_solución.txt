@@ -1,0 +1,11 @@
+| Problema | Modelo que ya viste | Por qué |
+| --- | --- | --- |
+| Baño con cubículos | Semáforo | Recurso limitado |
+| Baño unisex | Lectores–Escritores | Un grupo a la vez |
+| Puente 1 auto | Mutex | Exclusión mutua |
+| Puente N autos | Semáforo | Capacidad |
+| Puente por dirección | RwLock | Lectores–Escritores |
+| Cigarrero | Semáforos | Señalización entre roles |
+| Santa Claus | Monitor | Prioridades + colas |
+| Lectores–Escritores multi | RwLock/Monitor | Igual que el básico |
+| Ascensor | Semáforo / Channels / Monitor | Según variante |
