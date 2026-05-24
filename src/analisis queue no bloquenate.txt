@@ -1,0 +1,23 @@
+leo tail
+
+leo tail.next
+
+verifico si tail sigue siendo válido
+
+si tail.next == null → intento CAS para enlazar mi nodo
+
+si tail.next != null → ayudo a avanzar tail (otro CAS)
+
+si CAS falla → reintento desde el principio
+
+El loop existe porque CAS puede fallar si otro thread modificó el estado.
+
+🌼 2. ¿Cuándo CAS es “definitivo”?
+Cuando se cumple esta condición:
+
+rust
+if next.is_null() {
+    // tail realmente es el último nodo
+    CAS para enlazar new_node
+}
+Ese CAS es el que realmente inserta tu nodo.
