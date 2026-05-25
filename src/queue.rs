@@ -1,12 +1,12 @@
-struct Queue{
+struct Queue<T>{
     content: Vec<Node<T>>,
     //índices que apuntan a posiciones dentro de vector
     head: Option<usize>, //puntero lógico, índice del primero nodeo de Vec<Node>
     tail: Option<usize>, //puntero lógico, índice último nodo
 }
 
-struct Node{
-    content: T,
+struct Node<T>{
+    content: Option<T>,
     next: Option<usize>,
 }
 
@@ -28,7 +28,7 @@ impl<T> Queue<T>{
     fn enqueue(&mut self, value: T){
         let new_index = self.content.len();
         let new_node = Node{
-            content: value,
+            content: Some(value),
             next: None,
         };
         self.content.push(new_node);
@@ -45,13 +45,13 @@ impl<T> Queue<T>{
         }
     }
 
-    fn dequeue(&mut self){
+    fn dequeue(&mut self) -> Option<T>{
         let head_index = self.head?;
         let next_index = self.content[head_index].next; // índice del nodo sgte, pero a fin de cuentas, es un núemro
         self.head = next_index;
         if next_index.is_none(){
             self.tail = None;
         }
-        Some(self.content[head_index].content)
+        self.content[head_index].content.take()
     }
 }

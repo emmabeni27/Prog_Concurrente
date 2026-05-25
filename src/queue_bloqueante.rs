@@ -1,19 +1,19 @@
 use std::sync::{Mutex, Condvar, Arc};
 
-struct Queue{
+struct Queue<T>{
     content: Vec<Node<T>>,
     //índices que apuntan a posiciones dentro de vector
     head: Option<usize>, //puntero lógico, índice del primero nodeo de Vec<Node>
     tail: Option<usize>, //puntero lógico, índice último nodo
 }
 
-struct QueueB{
+struct QueueB<T>{
     components: Mutex<Queue<T>>, //mutex solo puede tener un parametro
-    cond: condvar
+    cond: Condvar
 }
 
-struct Node{
-    content: T,
+struct Node<T>{
+    content: Option<T>,
     next: Option<usize>,
 }
 
@@ -21,7 +21,7 @@ impl<T> QueueB<T>{
 
     fn new() -> Self {
         return QueueB{
-            components: Arc::new(Mutex::new(Queue{content: Vec::new(), head: None, tail: None,})), //fltaba el arc
+            components: Mutex::new(Queue{content: Vec::new(), head: None, tail: None,}), //el arc no va aca
             cond: Condvar::new()
         }; //no olvidar anotar el return!!!
     }
@@ -34,12 +34,12 @@ impl<T> QueueB<T>{
     }
 
     //no tendría límite
-    fn enqueue(&mut self, value: T){
+    fn enqueue(&self, value: T){
         let mut components = self.components.lock().unwrap();
 
-        let new_index = self.content.len();
+        let new_index = components.content.len();
         let new_node = Node{
-            content: value,
+            content: Some(value),
             next: None,
         };
         components.content.push(new_node);
@@ -70,7 +70,7 @@ impl<T> QueueB<T>{
         if next_index.is_none() {//si uso is_empty gnero un deadlock
             components.tail = None;
         }
-        let value = components.content[head_index].content;
+        let value = components.content[head_index].content.take().unwrap();
 
         value
     }

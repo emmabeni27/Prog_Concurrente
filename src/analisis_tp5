@@ -1,0 +1,110 @@
+Running benchmark: producers=4, consumers=4, items_per_producer=1000
+==============================
+BLOCKING QUEUE
+Inserted: 4000
+Consumed: 4000
+Time: 1.3098ms
+==============================
+==============================
+LOCK FREE QUEUE
+Inserted: 4000
+Consumed: 4000
+Time: 718.5µs
+==============================
+
+Running benchmark: producers=4, consumers=4, items_per_producer=100000
+==============================
+BLOCKING QUEUE
+Inserted: 400000
+Consumed: 400000
+Time: 93.8035ms
+==============================
+==============================
+LOCK FREE QUEUE
+Inserted: 400000
+Consumed: 400000
+Time: 95.6741ms
+==============================
+
+Running benchmark: producers=4, consumers=4, items_per_producer=1000000
+==============================
+BLOCKING QUEUE
+Inserted: 4000000
+Consumed: 4000000
+Time: 824.5676ms
+==============================
+==============================
+LOCK FREE QUEUE
+Inserted: 4000000
+Consumed: 4000000
+Time: 947.7005ms
+==============================
+
+A medida que la carga aumetna, disminuye la performance de la queue no bloquante
+
+Running benchmark: producers=4, consumers=1, items_per_producer=1000000
+==============================
+BLOCKING QUEUE
+Inserted: 4000000
+Consumed: 4000000
+Time: 648.0485ms
+==============================
+==============================
+LOCK FREE QUEUE
+Inserted: 4000000
+Consumed: 4000000
+Time: 559.7372ms
+==============================
+
+Running benchmark: producers=1, consumers=4, items_per_producer=1000000
+==============================
+BLOCKING QUEUE
+Inserted: 1000000
+Consumed: 1000000
+Time: 161.6539ms
+==============================
+==============================
+LOCK FREE QUEUE
+Inserted: 1000000
+Consumed: 1000000
+Time: 143.5844ms
+==============================
+
+CORRER NEUVAMENTE LOS SGTES, PERO CON MENOS DE 1_000_000
+
+  1. Alta Contención (Muchos hilos, pocos datos)
+  Esto fuerza a los hilos a pelearse por el "puntero" de la cola constantemente.
+
+   1 cargo run --release -- producers 20 -- consumers 20 -- items 1000
+   * Qué esperar: Aquí la Lock-Free suele sufrir mucho porque el loop de reintento falla constantemente (muchos hilos intentando cambiar el mismo puntero al mismo
+     tiempo).
+
+  2. Desbalance: Muchos Productores, 1 Consumidor
+  Simula un sistema de logs donde todo el mundo escribe pero solo uno procesa.
+
+   1 cargo run --release -- producers 10 -- consumers 1 -- items 100000
+   * Qué esperar: Es probable que la Lock-Free gane aquí, porque los productores no bloquean al consumidor. En la Bloqueante, cada vez que un productor toma el Lock, el
+     consumidor tiene que esperar.
+
+  3. Desbalance: 1 Productor, Muchos Consumidores
+  Simula un servidor distribuyendo tareas a muchos trabajadores.
+
+   1 cargo run --release -- producers 1 -- consumers 10 -- items 1000000
+   * Qué esperar: Similar a la anterior, pero evaluás la eficiencia del dequeue. En la Bloqueante, los consumidores se pelean por el Lock incluso si la cola tiene miles
+     de elementos.
+
+  4. El "Stress Test" total
+  Para ver cuál escala mejor antes de que el sistema se sature.
+
+   1 cargo run --release -- producers 32 -- consumers 32 -- items 10000
+   * Qué esperar: Si tenés un procesador de muchos núcleos, la Lock-Free debería mostrar una ventaja en "latencia", pero la Bloqueante suele ser más estable en
+     "throughput" (caudal total) porque el sistema operativo gestiona la espera de los hilos de forma más ordenada.
+
+  ---
+
+  Un tip para tu análisis:
+  ¿Por qué la Lock-Free se vuelve más lenta con 1.000.000 de ítems?
+   1. Cache Misses: Al usar Box::new para cada nodo, los datos están dispersos en la memoria.
+   2. Overhead de Atómicos: Cuando hay millones de operaciones, el procesador gasta mucho tiempo sincronizando los niveles de memoria (L1/L2/L3) entre núcleos.
+   3. La Bloqueante "duerme": Cuando la carga es masiva, el Mutex es muy eficiente porque pone a dormir los hilos que no pueden entrar, evitando que saturen el bus de
+      datos del procesador con reintentos inútiles.

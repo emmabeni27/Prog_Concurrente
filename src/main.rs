@@ -1,194 +1,586 @@
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::ptr;
+
+use std::sync::{
+    Arc,
+    Mutex,
+    Condvar,
+    atomic::{
+        AtomicPtr,
+        AtomicUsize,
+        Ordering,
+    },
+};
+
 use std::thread;
-use std::time::SystemTime;
+use std::time::Instant;
 
-//THREAD POOL
-type Job = Box<dyn FnOnce() + Send + 'static>;
+// =====================================================
+// QUEUE BLOQUEANTE
+// =====================================================
 
-pub struct ThreadPool {
-    workers: Vec<Worker>,
-    sender: Option<std::sync::mpsc::Sender<Job>>,
+struct Queue<T> {
+    content: Vec<Node<T>>,
+
+    // índices dentro del vector
+    head: Option<usize>,
+    tail: Option<usize>,
 }
 
-impl ThreadPool {
-    pub fn new(size: usize) -> Self {
-        assert!(size > 0);
-        let (sender, receiver) = std::sync::mpsc::channel::<Job>();
-        let receiver = Arc::new(Mutex::new(receiver));
+struct Node<T> {
+    content: Option<T>,
+    next: Option<usize>,
+}
 
-        let workers = (0..size)
-            .map(|id| Worker::new(id, Arc::clone(&receiver)))
-            .collect();
-        ThreadPool {
-            workers,
-            sender: Some(sender),
+struct QueueB<T> {
+    components: Mutex<Queue<T>>,
+    cond: Condvar,
+}
+
+impl<T> QueueB<T> {
+
+    fn new() -> Self {
+
+        QueueB {
+
+            components: Mutex::new(
+                Queue {
+                    content: Vec::new(),
+                    head: None,
+                    tail: None,
+                }
+            ),
+
+            cond: Condvar::new(),
         }
     }
-    pub fn execute<F>(&self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        self.sender.as_ref().unwrap().send(Box::new(f)).unwrap();
-    }
-}
 
-impl Drop for ThreadPool {
-    fn drop(&mut self) {
-        drop(self.sender.take());
-        for worker in &mut self.workers {
-            if let Some(t) = worker.thread.take() {
-                t.join().unwrap();
+    fn is_empty(&self) -> bool {
+
+        let components =
+            self.components.lock().unwrap();
+
+        components.head.is_none()
+    }
+
+    fn enqueue(&self, value: T) {
+
+        let mut components =
+            self.components.lock().unwrap();
+
+        let new_index =
+            components.content.len();
+
+        let new_node = Node {
+            content: Some(value),
+            next: None,
+        };
+
+        components.content.push(new_node);
+
+        match components.tail {
+
+            // cola vacía
+            None => {
+
+                components.head =
+                    Some(new_index);
+
+                components.tail =
+                    Some(new_index);
+            }
+
+            // cola no vacía
+            Some(tail_index) => {
+
+                components.content[tail_index]
+                    .next = Some(new_index);
+
+                components.tail =
+                    Some(new_index);
             }
         }
+
+        // despierta consumidores
+        self.cond.notify_one();
+    }
+
+    fn dequeue(&self) -> T {
+
+        let mut components =
+            self.components.lock().unwrap();
+
+        // esperar mientras esté vacía
+        while components.head.is_none() {
+
+            components =
+                self.cond.wait(components).unwrap();
+        }
+
+        let head_index =
+            components.head.unwrap();
+
+        let next_index =
+            components.content[head_index].next;
+
+        components.head = next_index;
+
+        // quedó vacía
+        if next_index.is_none() {
+            components.tail = None;
+        }
+
+        components.content[head_index]
+            .content
+            .take()
+            .unwrap()
     }
 }
 
-struct Worker {
-    _id: usize,
-    thread: Option<thread::JoinHandle<()>>,
+// =====================================================
+// LOCK FREE QUEUE
+// =====================================================
+
+struct LFNode<T> {
+
+    // dummy => None
+    // reales => Some
+    value: Option<T>,
+
+    next: AtomicPtr<LFNode<T>>,
 }
 
-impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<std::sync::mpsc::Receiver<Job>>>) -> Self {
-        let thread = thread::spawn(move || {
-            loop {
-                match receiver.lock().unwrap().recv() {
-                    Ok(job) => job(),
-                    Err(_) => {
-                        println!("Worker {id} terminado");
-                        break;
+pub struct LockFreeQueue<T> {
+
+    // apunta al dummy
+    head: AtomicPtr<LFNode<T>>,
+
+    // apunta al último nodo real
+    tail: AtomicPtr<LFNode<T>>,
+}
+
+impl<T> LockFreeQueue<T> {
+
+    pub fn new() -> Self {
+
+        let dummy =
+            Box::into_raw(
+                Box::new(
+                    LFNode {
+
+                        value: None,
+
+                        next: AtomicPtr::new(
+                            ptr::null_mut()
+                        ),
                     }
+                )
+            );
+
+        Self {
+
+            head: AtomicPtr::new(dummy),
+
+            tail: AtomicPtr::new(dummy),
+        }
+    }
+
+    pub fn enqueue(&self, value: T) {
+
+        let new_node =
+            Box::into_raw(
+                Box::new(
+                    LFNode {
+
+                        value: Some(value),
+
+                        next: AtomicPtr::new(
+                            ptr::null_mut()
+                        ),
+                    }
+                )
+            );
+
+        loop {
+
+            let tail =
+                self.tail.load(Ordering::Acquire);
+
+            let next = unsafe {
+                (*tail).next.load(Ordering::Acquire)
+            };
+
+            // validar tail
+            if tail ==
+                self.tail.load(Ordering::Acquire)
+            {
+
+                // tail real
+                if next.is_null() {
+
+                    let res = unsafe {
+
+                        (*tail).next.compare_exchange(
+                            ptr::null_mut(),
+                            new_node,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
+                    };
+
+                    if res.is_ok() {
+
+                        let _ =
+                            self.tail.compare_exchange(
+                                tail,
+                                new_node,
+                                Ordering::AcqRel,
+                                Ordering::Acquire,
+                            );
+
+                        return;
+                    }
+
+                } else {
+
+                    // ayudar a mover tail
+                    let _ =
+                        self.tail.compare_exchange(
+                            tail,
+                            next,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        );
                 }
             }
-        });
-        Worker {
-            _id: id,
-            thread: Some(thread),
-        }
-    }
-}
-
-//SERVIDOR
-
-fn main() -> std::io::Result<()> {
-    //creo un TcpListener escuchando en el puerto 3000
-    let listener = TcpListener::bind("127.0.0.1:3000")?;
-    //let n = 6;
-    let pool = ThreadPool::new(8);
-    //aceptar conexiones continuas y procesarlas
-    for stream in listener.incoming() {
-        let stream = stream?; //? cumple la función de unwrap()
-        pool.execute(move|| { //move es necesario, poruqe el closure tiene que tomar ownership de stream, si no, no compila
-            //closure ~ lambda
-            //let m= n+1;
-            handle_client(stream);
-        });
-    }
-
-    Ok(())
-}
-
-//MANAGER RTA
-
-//lee header del request http del tcpStream
-fn handle_client(mut p0: TcpStream) {
-    let mut lines = BufReader::new(&mut p0); //para poder leerlo línea a línea
-
-    let mut first_line = String::new(); //tomo la primera línea, me interesa pro el contenido
-    lines.read_line(&mut first_line).unwrap(); // guardo el contenido
-
-    //debo consumir el resto del contendio para que el stream no quede atascado y el cliente esperando
-    for line in lines.by_ref().lines() {
-        //toma prestado el reader y luego lo devuelve
-        let line = line.unwrap();
-        if line.is_empty() {
-            break; //paro de leer porque empiezan los headers
         }
     }
 
-    //parseo la primera línea
-    let slices: Vec<&str> = first_line.split(' ').collect(); //[0] GET [1] ruta [2]versión
-    if slices.len() < 2 {
-        return;
-    }
-    //acalro el tipo para que no sea unkown para el exterior. .collect() me permite acceder por índice
+    pub fn dequeue(&self) -> Option<T> {
 
-    //construyo la rta
-    let route = &slices[1];
-    let slash: Vec<&str> = route.split("/").collect();
+        loop {
 
-    if slash.len() < 3 {
-        let body = "Formato inválido. Usar /pi/<numero>";
-        let response = format!(
-            "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.len(),
-            body
-        );
-        p0.write_all(response.as_bytes()).unwrap();
-        return;
-    }
+            let head =
+                self.head.load(Ordering::Acquire);
 
-    let response;
-    if slash[1] == "pi" {
-        match slash[2].parse::<u64>() {
-            Ok(numero) => {
-                let start = SystemTime::now();
-                let result = liebniz(numero);
-                let time = start.elapsed().unwrap();
+            let tail =
+                self.tail.load(Ordering::Acquire);
 
-                let body = format!(
-                    "Valor de Pi para el termino {}: {} (Tiempo: {:?})",
-                    slash[2], result, time,
+            let next = unsafe {
+                (*head).next.load(Ordering::Acquire)
+            };
+
+            // validación
+            if head ==
+                self.head.load(Ordering::Acquire)
+            {
+
+                // vacía
+                if next.is_null() {
+                    return None;
+                }
+
+                // tail atrasado
+                if head == tail {
+
+                    let _ =
+                        self.tail.compare_exchange(
+                            tail,
+                            next,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        );
+
+                    continue;
+                }
+
+                // mover head
+                let res =
+                    self.head.compare_exchange(
+                        head,
+                        next,
+                        Ordering::AcqRel,
+                        Ordering::Acquire,
+                    );
+
+                if res.is_ok() {
+                    // leer valor SOLO SI ganamos el CAS (somos dueños del nodo)
+                    let value = unsafe {
+                        (*next).value.take()
+                    };
+
+                    // simplificación académica:
+                    // liberar dummy viejo desactivado para evitar corrupción de memoria (STATUS_HEAP_CORRUPTION)
+                    /*
+                    unsafe {
+                        drop(Box::from_raw(head));
+                    }
+                    */
+
+                    return value;
+                }
+                }
+                }
+                }
+
+                pub fn is_empty(&self) -> bool {
+
+                let head =
+                self.head.load(Ordering::Acquire);
+
+                let next = unsafe {
+                (*head).next.load(Ordering::Acquire)
+                };
+
+                next.is_null()
+                }
+                }
+
+                impl<T> Drop for LockFreeQueue<T> {
+
+                fn drop(&mut self) {
+
+                while self.dequeue().is_some() {}
+
+                let dummy =
+                self.head.load(Ordering::Relaxed);
+
+                /*
+                unsafe {
+                drop(Box::from_raw(dummy));
+                }
+                */
+                }
+                }
+
+                // =====================================================
+                // BENCHMARK BLOQUEANTE
+                // =====================================================
+
+                fn benchmark_blocking(
+                producers: usize,
+                consumers: usize,
+                items_per_producer: usize,
+                ) {
+
+                let queue =
+                Arc::new(
+                QueueB::<usize>::new()
                 );
 
-                response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
+                let consumed =
+                Arc::new(
+                AtomicUsize::new(0)
                 );
-            }
-            Err(_) => {
-                let body =
-                    "El argumento introducido deber ser un positivo entero. Ejemplo: /pi/100";
 
-                response = format!(
-                    "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                ); //content length = 0
-            }
-        }
-    } else {
-        let body = "La ruta es pi. Ejemplo: /pi/100";
+                let total_items =
+                producers * items_per_producer;
 
-        response = format!(
-            "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
-            body.len(),
-            body
-        ); //primer rn termina el último header, segundo rn línea vacía obligatoria
-    }
+                let start = Instant::now();
 
-    //enviar rta
-    p0.write_all(response.as_bytes()).unwrap();
-}
+                // =================================================
+                // PRODUCTORES
+                // =================================================
 
-//servidor de socket tcp escuchando conexiones
-// & referencia sin tomar ownership
+                let mut producer_handles = vec![];
+                for p in 0..producers {
+                let q = Arc::clone(&queue);
+                let handle = thread::spawn(move || {
+                for i in 0..items_per_producer {
+                q.enqueue(p * items_per_producer + i);
+                }
+                });
+                producer_handles.push(handle);
+                }
 
-//LIEBNIZ - ahora sin paralelismo para optimizar el aporvechamiento del thread pool (si no, tengo x hilos trabajando dentro de cada hilo del thread pool)
+                for h in producer_handles {
+                h.join().unwrap();
+                }
 
-fn liebniz(n: u64) -> f64 {
-    let mut sum = 0.0;
+                // =================================================
+                // AVISAR A CONSUMIDORES (Poison Pill)
+                // =================================================
+                for _ in 0..consumers {
+                queue.enqueue(usize::MAX); // Valor centinela
+                }
 
-    for i in 0..n {
-        sum += (if i % 2 == 0 { 1.0 } else { -1.0 }) / (2.0 * i as f64 + 1.0);
-    }
+                // =================================================
+                // CONSUMIDORES
+                // =================================================
 
-    4.0 * sum
-}
+                let mut consumer_handles = vec![];
+                for _ in 0..consumers {
+                let q = Arc::clone(&queue);
+                let consumed_counter = Arc::clone(&consumed);
+                let handle = thread::spawn(move || {
+                loop {
+                let val = q.dequeue();
+                if val == usize::MAX {
+                    break;
+                }
+                consumed_counter.fetch_add(1, Ordering::Relaxed);
+                }
+                });
+                consumer_handles.push(handle);
+                }
 
-//liebniz es matemático, no teine sentido que pueda fallar
-//hay mensaaje de error pero no se muestran en un body
-//cargo fmt
+                for h in consumer_handles {
+                h.join().unwrap();
+                }
+
+                let elapsed = start.elapsed();
+
+                println!("==============================");
+                println!("BLOCKING QUEUE");
+                println!("Inserted: {}", total_items);
+
+                println!(
+                "Consumed: {}",
+                consumed.load(Ordering::Relaxed)
+                );
+
+                println!("Time: {:?}", elapsed);
+                println!("==============================");
+                }
+
+                // =====================================================
+                // BENCHMARK LOCK FREE
+                // =====================================================
+
+                fn benchmark_lockfree(
+                producers: usize,
+                consumers: usize,
+                items_per_producer: usize,
+                ) {
+
+                let queue =
+                Arc::new(
+                LockFreeQueue::<usize>::new()
+                );
+
+                let consumed =
+                Arc::new(
+                AtomicUsize::new(0)
+                );
+
+                let total_items =
+                producers * items_per_producer;
+
+                let start = Instant::now();
+
+                // =================================================
+                // PRODUCTORES
+                // =================================================
+
+                let mut producer_handles = vec![];
+                for p in 0..producers {
+                let q = Arc::clone(&queue);
+                let handle = thread::spawn(move || {
+                for i in 0..items_per_producer {
+                q.enqueue(p * items_per_producer + i);
+                }
+                });
+                producer_handles.push(handle);
+                }
+
+                for h in producer_handles {
+                h.join().unwrap();
+                }
+
+                // =================================================
+                // AVISAR A CONSUMIDORES (Poison Pill)
+                // =================================================
+                for _ in 0..consumers {
+                queue.enqueue(usize::MAX);
+                }
+
+                // =================================================
+                // CONSUMIDORES
+                // =================================================
+
+                let mut consumer_handles = vec![];
+                for _ in 0..consumers {
+                let q = Arc::clone(&queue);
+                let consumed_counter = Arc::clone(&consumed);
+                let handle = thread::spawn(move || {
+                loop {
+                if let Some(val) = q.dequeue() {
+                    if val == usize::MAX {
+                        break;
+                    }
+                    consumed_counter.fetch_add(1, Ordering::Relaxed);
+                }
+                }
+                });
+                consumer_handles.push(handle);
+                }
+
+                for h in consumer_handles {
+                h.join().unwrap();
+                }
+
+                let elapsed = start.elapsed();
+
+                println!("==============================");
+                println!("LOCK FREE QUEUE");
+                println!("Inserted: {}", total_items);
+
+                println!(
+                "Consumed: {}",
+                consumed.load(Ordering::Relaxed)
+                );
+
+                println!("Time: {:?}", elapsed);
+                println!("==============================");
+                }
+
+                // =====================================================
+                // MAIN
+                // =====================================================
+
+                fn main() {
+                let args: Vec<String> = std::env::args().collect();
+
+                let mut producers = 4;
+                let mut consumers = 4;
+                let mut items = 100000;
+
+                let mut i = 1;
+                while i < args.len() {
+                match args[i].as_str() {
+                "--producers" | "producers" => {
+                if i + 1 < args.len() {
+                    producers = args[i + 1].parse().unwrap_or(producers);
+                    i += 1;
+                }
+                }
+                "--consumers" | "consumers" => {
+                if i + 1 < args.len() {
+                    consumers = args[i + 1].parse().unwrap_or(consumers);
+                    i += 1;
+                }
+                }
+                "--items" | "items" => {
+                if i + 1 < args.len() {
+                    items = args[i + 1].parse().unwrap_or(items);
+                    i += 1;
+                }
+                }
+                _ => {}
+                }
+                i += 1;
+                }
+
+                println!("Running benchmark: producers={}, consumers={}, items_per_producer={}", producers, consumers, items);
+
+                benchmark_blocking(
+                producers,
+                consumers,
+                items,
+                );
+
+                benchmark_lockfree(
+                producers,
+                consumers,
+                items,
+                );
+                }
