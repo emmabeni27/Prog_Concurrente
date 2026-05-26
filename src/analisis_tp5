@@ -75,21 +75,21 @@ CORRER NEUVAMENTE LOS SGTES, PERO CON MENOS DE 1_000_000
   1. Alta Contención (Muchos hilos, pocos datos)
   Esto fuerza a los hilos a pelearse por el "puntero" de la cola constantemente.
 
-   1 cargo run --release -- producers 20 -- consumers 20 -- items 1000
+   1 cargo run --release -- producers 20 -- consumers 20 -- items 1000  //BLOKING - TPO
    * Qué esperar: Aquí la Lock-Free suele sufrir mucho porque el loop de reintento falla constantemente (muchos hilos intentando cambiar el mismo puntero al mismo
      tiempo).
 
   2. Desbalance: Muchos Productores, 1 Consumidor
   Simula un sistema de logs donde todo el mundo escribe pero solo uno procesa.
 
-   1 cargo run --release -- producers 10 -- consumers 1 -- items 100000
+   1 cargo run --release -- producers 10 -- consumers 1 -- items 100000 //BLOCKING - TPO
    * Qué esperar: Es probable que la Lock-Free gane aquí, porque los productores no bloquean al consumidor. En la Bloqueante, cada vez que un productor toma el Lock, el
      consumidor tiene que esperar.
 
   3. Desbalance: 1 Productor, Muchos Consumidores
   Simula un servidor distribuyendo tareas a muchos trabajadores.
 
-   1 cargo run --release -- producers 1 -- consumers 10 -- items 1000000
+   1 cargo run --release -- producers 1 -- consumers 10 -- items 1000000 //NON_B - TPO SI LO CORRO CON 1000, CON 1MILLON TARDA +
    * Qué esperar: Similar a la anterior, pero evaluás la eficiencia del dequeue. En la Bloqueante, los consumidores se pelean por el Lock incluso si la cola tiene miles
      de elementos.
 
@@ -108,3 +108,9 @@ CORRER NEUVAMENTE LOS SGTES, PERO CON MENOS DE 1_000_000
    2. Overhead de Atómicos: Cuando hay millones de operaciones, el procesador gasta mucho tiempo sincronizando los niveles de memoria (L1/L2/L3) entre núcleos.
    3. La Bloqueante "duerme": Cuando la carga es masiva, el Mutex es muy eficiente porque pone a dormir los hilos que no pueden entrar, evitando que saturen el bus de
       datos del procesador con reintentos inútiles.
+
+
+ 1) prod y cons balanceados, pocos items: no bloqueante es MUCHO más rápido
+ 2) prod y cons balanceados, medioano de items: más parejos
+ 3) prod y cons balanceados, muchos items:  bloqueante es UN POCO más rápido
+ 4) prod> cons: nonB es más rápida. Si prod < cons tmb

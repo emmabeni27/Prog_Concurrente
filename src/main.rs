@@ -396,9 +396,7 @@ impl<T> LockFreeQueue<T> {
                 h.join().unwrap();
                 }
 
-                // =================================================
-                // AVISAR A CONSUMIDORES (Poison Pill)
-                // =================================================
+             
                 for _ in 0..consumers {
                 queue.enqueue(usize::MAX); // Valor centinela
                 }

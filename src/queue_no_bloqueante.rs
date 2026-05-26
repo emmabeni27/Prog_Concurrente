@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 
 struct Node<T> {
     value: Option<T>, //dummy tiene none y nodos reales some
-    next: AtomicPtr<Node<T>>,//spunta al útlimo, o al dummy si es´ta vcio
+    next: AtomicPtr<Node<T>>,//spunta al útlimo, o al dummy si es´ta vcio. Si quiero que sea no bloquenate, no tengo más opción que AtomicPtr
 }
 
 pub struct LockFreeQueue<T> {
