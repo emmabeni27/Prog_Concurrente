@@ -19,14 +19,14 @@ struct Node<T>{
 
 impl<T> QueueB<T>{
 
-    fn new() -> Self {
+    fn new() -> Self { //devuelo algo nuevo
         return QueueB{
             components: Mutex::new(Queue{content: Vec::new(), head: None, tail: None,}), //el arc no va aca
             cond: Condvar::new()
         }; //no olvidar anotar el return!!!
     }
 
-    fn is_empty(&self) -> bool{
+    fn is_empty(&self) -> bool{ //bloque y veo si es none head
         let components = self.components.lock().unwrap(); //si no puede adquirir el lock, se bloquea y desbloqueará solo caundo el mutex lo libere. Mientras tanto, no consume recursos. No lo libera pq nunca lo tomó
         return components.head.is_none() //puedo omitir el return. Al salir de scope dropea automático
         //no uso notify, eso es para caso manual y aca se encarga el SO de despertarlos
@@ -34,7 +34,7 @@ impl<T> QueueB<T>{
     }
 
     //no tendría límite
-    fn enqueue(&self, value: T){
+    fn enqueue(&self, value: T){ //lock, nuevo índice, creo nodo con contenido nuevo, pusheo nuevo nodo, reacomodo ectores si none o some. NOtify y dropea solo
         let mut components = self.components.lock().unwrap();
 
         let new_index = components.content.len();
@@ -54,14 +54,14 @@ impl<T> QueueB<T>{
                 components.tail = Some(new_index); //muevo puntero tail al nuevo nodo
             }
         }
-
+        drop(components); //dropea solo, no hace falta pero tampoco daño. Mejor quizás nates del notify
         self.cond.notify_one(); //despierta a los que esperaban dequeue porqu estaba vacía
     }
 
     fn dequeue(&self) -> T {
         let mut components = self.components.lock().unwrap();
         while components.head.is_none() {
-            components = self.cond.wait(components).unwrap();
+            components = self.cond.wait(components).unwrap(); //libera y despierta cuando se llene
         }
 
         let head_index = components.head.unwrap();
@@ -71,7 +71,6 @@ impl<T> QueueB<T>{
             components.tail = None;
         }
         let value = components.content[head_index].content.take().unwrap();
-
         value
     }
 
