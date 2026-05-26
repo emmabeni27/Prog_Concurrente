@@ -31,7 +31,7 @@ impl<T> Queue<T>{
             content: Some(value),
             next: None,
         };
-        self.content.push(new_node);
+        self.content.push(new_node); //es un vector al que le doy comportamiento de queue
         match self.tail {
             //queue vacía. head,tail = None y content = []
             None => {
