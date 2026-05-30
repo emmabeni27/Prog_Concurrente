@@ -1,0 +1,43 @@
+1. ¿Cuál es más eficiente en manejar muchas tareas con esperas?
+¿Por qué threads falla y async no? ¿Qué recurso del sistema se agota?
+
+Async es ampliamente más eficiente para I/O. Con 10000 tasks, threads tarda ~670ms vs ~115ms de async.
+El recurso que se agota con threads es memoria de stack y entradas en la tabla de procesos del kernel:
+cada thread requiere stack propio y metadata del SO. En Windows el límite se alcanza antes que en Linux
+y el proceso se cuelga en lugar de fallar limpiamente, como se observó al intentar 100K+ threads.
+Async no tiene este problema porque Tokio corre miles de corrutinas sobre un puñado de threads reales —
+cuando una tarea hace .await sobre un sleep, el thread queda libre para atender otras.
+
+============================================================================================
+
+2. ¿Qué modelo se desempeña mejor para CPU intensivo? ¿Son muy diferentes los resultados? ¿Por qué?
+
+Con pocas tasks (1–16) los resultados son muy similares: ambos aprovechan los núcleos disponibles y la
+diferencia es ruido de medición. Con tasks altas (100K), async gana 15x porque spawn_blocking usa un pool
+acotado de threads en lugar de crear uno nuevo por tarea. Para CPU-bound con paralelismo razonable, la
+diferencia es despreciable.
+
+============================================================================================
+
+3. ¿Cómo escala cada enfoque? ¿En qué punto el overhead de crear threads supera el beneficio del paralelismo?
+
+El punto de quiebre está entre tasks=8 y tasks=16, que coincide con los núcleos físicos de la máquina — más
+allá de ahí agregar tasks no reduce el tiempo. Para threads con trabajo pequeño, el overhead ya es visible
+desde tasks=100 (7ms vs 1ms) y crece linealmente con N porque crear y destruir threads es O(N).
+
+============================================================================================
+
+4. ¿Qué diferencia real hay entre threads y async para tareas CPU-bound sin .await?
+¿Cuándo conviene usar spawn_blocking?
+
+Un tokio::spawn normal con trabajo CPU-bound sin .await bloquea un thread del runtime e impide que
+otras tareas async se ejecuten, degradando todo el sistema. spawn_blocking es la solución correcta:
+mueve el trabajo a un pool separado, deja libre el runtime para I/O, y reutiliza threads en lugar de
+crear uno por tarea. Conviene usarlo siempre que haya cómputo pesado dentro de un contexto async.
+
+Mini conclusión
+Async no es universalmente mejor: para CPU-bound con pocas tareas ambos modelos son equivalentes.
+La ventaja de async aparece en dos escenarios concretos: I/O con alta concurrencia (donde threads agota
+recursos del SO) y CPU con muchas tareas pequeñas (donde spawn_blocking evita el overhead de creación).
+La elección del modelo debe guiarse por el tipo de trabajo y el nivel de concurrencia esperado, no por una
+preferencia general.
