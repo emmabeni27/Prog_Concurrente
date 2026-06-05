@@ -1,0 +1,73 @@
+object Urna {
+    case class RegistrarVotante(nombre: String, ref: ActorRef)
+    case class EmitirVoto(nombre: String, candidato: String)
+    case object CerrarUrna
+    case object ContarResultados
+}
+
+object Votante {
+    case class Registrarse(nombre: String, ref: ActorRef) //envía
+    case class Votar(candidato: String) //envía
+    case object Confirmacion(texto: String) //recibe
+}
+
+class Votante extends Actor{
+    
+    import Votante._
+    
+    def receive: Receive = inactivo //en sin_v si puedo tener estado
+    
+    def inactivo: Receive = {
+        case Registrarse(nombre, refUrna) => 
+        refUrna ! Urna.RegistrarVotante(nombre, self)
+        context.become(sin_v)
+    }
+    
+    def sin_v(nombre: String, refUrna: ActorRef): Receive = {
+        case Votar(candidato) => 
+        refUrna ! EmitirVoto(nombre, candidato)
+        context.become(ya_v)
+    }
+    
+    def ya_v(): Receive ={
+        case 
+    }
+    
+}
+
+class Urna extends Actor{
+    
+    import Urna._
+    
+    def receive: Receive = abierta(Map.empty, Map.empty)
+    
+    //nombre votante_ ref votante | nombre_votante nombre_candidato
+    def abierta(votantes: Map[String, ActorRef], votos: Map[String, String]): Receive = {
+        
+        case RegsitrarVotante(nombre: String, ref: ActorRef) => 
+            context.become(abierta(votantes + (nombre -> ref), votos))
+            
+        case EmitirVoto(nombre: String, candidato: String) => 
+            if (!votantes.contains(nombre)){
+                println(s"El votante $nombre no está registrado")
+            }
+            else if (votos.contains(nombre)){
+                println(s"$nombre ya emitió su voto")
+            }
+            else{
+                val ref = votantes(nombre)
+                ref ! Votante.Confirmación("Su voto fue registrado")
+                context.become(abierta(votantes, votos + (nombre -> candidato)))
+            }
+        case CerrarUrna =>
+            val resultados = votes.values.groupBy(identity).map {case (c, vs) => (c, vs.size)}
+            val ganador = resultados.maxBy(_._2)._1 //enceuntro el maximo de los segundos valores y retorno el primer valor asociado
+            context.become(cerrada(resultados)) // pasarle los resultados
+        
+    }
+    
+    def cerrada(resultados: Map[String, Int]): Receive = {
+        case ConsultarResultado => sender() ! resultados
+        
+    }
+}
