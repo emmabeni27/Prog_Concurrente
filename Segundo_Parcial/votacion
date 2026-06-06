@@ -8,7 +8,7 @@ object Urna {
 object Votante {
     case class Registrarse(nombre: String, ref: ActorRef) //envía
     case class Votar(candidato: String) //envía
-    case object Confirmacion(texto: String) //recibe
+    case class Confirmacion(texto: String) //recibe
 }
 
 class Votante extends Actor{
@@ -20,7 +20,7 @@ class Votante extends Actor{
     def inactivo: Receive = {
         case Registrarse(nombre, refUrna) => 
         refUrna ! Urna.RegistrarVotante(nombre, self)
-        context.become(sin_v)
+        context.become(sin_v(nombre, refUrna)) //PASAR REFERENCIA 🐞
     }
     
     def sin_v(nombre: String, refUrna: ActorRef): Receive = {
@@ -29,8 +29,8 @@ class Votante extends Actor{
         context.become(ya_v)
     }
     
-    def ya_v(): Receive ={
-        case 
+    def ya_v: Receive ={
+        case Confirmacion(mensaje: String) => println(s"$mensaje")
     }
     
 }
@@ -56,11 +56,11 @@ class Urna extends Actor{
             }
             else{
                 val ref = votantes(nombre)
-                ref ! Votante.Confirmación("Su voto fue registrado")
+                ref ! Votante.Confirmacion("Su voto fue registrado")
                 context.become(abierta(votantes, votos + (nombre -> candidato)))
             }
         case CerrarUrna =>
-            val resultados = votes.values.groupBy(identity).map {case (c, vs) => (c, vs.size)}
+            val resultados = votos.values.groupBy(identity).map {case (c, vs) => (c, vs.size)}
             val ganador = resultados.maxBy(_._2)._1 //enceuntro el maximo de los segundos valores y retorno el primer valor asociado
             context.become(cerrada(resultados)) // pasarle los resultados
         
