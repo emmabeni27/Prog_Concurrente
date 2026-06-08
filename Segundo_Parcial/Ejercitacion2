@@ -1,0 +1,119 @@
+Start
+Middle
+Finished Beta
+Launch done: 4
+//cuando terminen los 300 (porqu een 200 falta d1)
+Fninished Gamma
+Async done: 5
+FInished alpha
+Async1 done: 5
+Sum: 10
+
+/////////////////////////////////////////
+class Stack<E> {
+    class Node<E>(val item: E, var next: Node<E>? = null)
+
+    private var top: Node<E>? = AtomicReference<Node<E>> (null)
+
+    fun push(item: E) {
+        
+        while(true){
+            val oldTop = top.get()
+            val updateNode = Node(item, oldTop)
+            if(top.compareAndSet(oldTop, updateNode){
+                return
+            })
+        }
+    }
+
+    fun pop(): E? {
+    
+        while(true){
+            val oldTop = top.get()
+            val newTop = oldTop.next.get()
+        }
+        
+        if(top.compareAndSet(oldTop, newTop)){
+            return oldTop.item
+        }
+    }
+}
+/////////////////////////////////////////
+
+actores: triage             doctor                     patient: desatendido | en triage | atendido
+         recibe paciente    atiende en orden           llega al ttriage
+         asigna prioridad   notifica cuadno termina    espera
+         envia al médico                               recibe etención
+
+
+object triage{
+    case class Assign(patient: String, name: ActorRef, severity: Int)
+}
+
+object doctor{
+    case class Attend(patient: String, name: ActorRef, priority: String)
+    case class Notify(name: ActorRef)
+}
+
+object patient{
+    case object Arrive
+    case class Done(name: ActorRef, priority: String)
+}
+
+class Triage(doctor: ActorRef) extends Actor{ //asumo médico único
+    
+    import Triage._
+    
+    def receive: Receive = {
+        case Assign(patient, name, severity) => 
+            val priority = if (severity>7) "HIGH" else "LOW"
+            doctor ! Attend(patient, name, priority)
+    }
+}
+
+class Doctor extends Actor {
+  import Doctor._
+  import context.dispatcher
+
+  def receive: Receive = libre
+
+  def libre: Receive = {
+    case Attend(patient, name, priority) =>
+      println(s"[Doctor] Attending $name with priority $priority")
+      context.system.scheduler.scheduleOnce(2.seconds, self, FinishedAttending(patient, name, priority))
+      context.become(ocupado(Queue.empty))
+  }
+
+  def ocupado(queue: Queue[(ActorRef, String, String)]): Receive = {
+    case Attend(patient, name, priority) =>
+      context.become(ocupado(queue :+ (patient, name, priority)))
+
+    case FinishedAttending(patient, name, priority) =>
+      patient ! Done(name, priority)
+      queue.headOption match {
+        case Some((p, n, pr)) =>
+          self ! Attend(p, n, pr)
+          context.become(libre)
+        case None =>
+          context.become(libre)
+      }
+  }
+}
+
+class Patient(triage: ActorRef, name: String) extends Actor{
+    import Patient._
+    
+    def recieve: Recieve = destendido(8)
+    
+    def desatendido(priority: Int): Receive = {
+        case Arrive => triage ! Assign(name, self, priority)
+        context.become(enTriage)
+    }
+    
+    def enTriage: Receive = {
+        case Done(name, priority) => 
+            println!(s"$name recicbió atención para su poribelma de prioridad $priority")
+            context.become(atendido)
+    }
+    
+}
