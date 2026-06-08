@@ -1,0 +1,137 @@
+actores:   chatroom          user                    logger
+mensajes:  conecta usuario   joins room              copia y archivo
+           broadcast         envia y recibe de otro
+
+solo user tiene estado (conectado / desconectado)
+
+object Chatroom{
+    case class register(user: ActorRef) //manda mensaje de confirmación y lo registra a lista
+    case class broadcast(from: ActorRef, text: String) //manda a todos excepto from y archiva en logger
+    case class remove(user: ActorRef) //lo remueve de la lista al user
+}
+
+object User{
+    case object join //debe saber a quien solicitar, prametro de la clase
+    case class send
+    case object receive //puede ser de broadcast de otro o de enrolamiento
+    case object leave
+}
+
+object Logger{
+    case class save(user: ActorRef, text: String)
+}
+
+class Logger extends Actor{
+    import Logger._
+    
+    def receive: Receive = state(Map.empty)
+    
+    def state(log: Map[actorRef, String]): rECEIVE = {
+        case save(user, text) => context.become(log + (user -> text))
+    }
+    /*
+    def state(log: Map[ActorRef, List[String]]): Receive = {
+    case Save(user, text) =>
+        val prev = log.getOrElse(user, List.empty)
+        context.become(state(log + (user -> (prev :+ text))))
+    }
+    */
+}
+
+class User(chatroom: actorRef) extends Actor{
+    import User._
+    
+    def receive: Receive = out
+    
+    def out: Receive = {
+        case join => 
+            chatroom ! register(self)
+            context.become(in)
+    }
+    
+    def in: Receive = {
+        case send(text) => chatroom ! broadcast(self, text) //🪲 NO OLVIDDAR SLEF
+        case receive(text) => prinln(s"$text")
+        case leave => context.become(out)
+    }
+}
+
+class Chatroom(logger: ActorRef) extends Actor{
+    import Chatroom._
+    
+    def receive: Receive = state(List.empty)
+    
+    def state(users: List[ActorRef]): Receive = {
+        
+        case register(user) => 
+            user ! Receive("Registro exitoso")
+            context.become(state(users :+ user))
+        
+        case broadcast(from, text) =>
+            users.foreach(elem => if(elem != from{
+                elem ! Receive(text)
+            }))
+            logger ! save(from, text)
+        
+        case remove(user) => 
+            //context.become(state(users - user))
+            context.become(state(users.filterNot(_ == user)))
+    }
+}
+///////////////////////////////////////////////////////
+class Queue<E> {
+    class Node<E>(val item: E, var next: Node<E>? = null)
+
+    private var head: Node<E>? = AtomicReference <Node<E>> (null)
+    private var tail: Node<E>? = AtomicReference <Node<E>> (null)
+
+    fun enqueue(item: E) {
+    
+        val newNode = Node(item, null)
+        
+        val t = tail.get()
+        val next = t.next.get()
+        
+        while(true){
+        //nunca tail == null porque está el dummy
+            if (next == null){
+                if(t.next.compareAndSet(null, newNode)){
+                    tail.compareAndSet(t, newNode)
+                    return
+                }
+            }
+            else{
+                tail.compareAndSet(t, next)
+            }
+        }
+    }
+
+    fun dequeue(): E? {
+        
+        while(true){
+            val first = head.get()
+            val last = tail.get()
+            val second = first.next.get()
+            
+            if(next == null){
+                return null
+            }
+            if(first == last){
+                tail.compareAndSet(last, second)
+                continue
+            }
+            if(head.compareAndSet(first, second)){
+                return second.item
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////
+Start
+Middle
+Done with AsyncA
+Done with AsyncB
+Combined: Result-AsyncA | Result-AsyncB
+Done with LaunchTask
+Launch result: Result-LaunchTask
